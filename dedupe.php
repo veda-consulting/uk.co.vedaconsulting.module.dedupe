@@ -106,3 +106,52 @@ function dedupe_civicrm_caseTypes(&$caseTypes) {
 function dedupe_civicrm_alterSettingsFolders(&$metaDataFolders = NULL) {
   _dedupe_civix_civicrm_alterSettingsFolders($metaDataFolders);
 }
+
+/**
+ * Implements hook_civicrm_merge
+ */
+function dedupe_civicrm_merge($type, &$data, $mainId, $otherId, $tables) {
+  if ($type == 'flip') {
+    $doSwap = FALSE;
+    $query  = "SELECT count(*) FROM civicrm_contribution WHERE contact_id = %1";
+    $SrcCount = CRM_Core_DAO::singleValueQuery($query, array(1 => array($data['srcID'], 'Integer')));
+    $dstCount = CRM_Core_DAO::singleValueQuery($query, array(1 => array($data['dstID'], 'Integer')));
+    if ($SrcCount > $dstCount) {
+      // keep contact with max contributions as destination (contact to be retained)
+      $doSwap = TRUE;
+    } else if ($data['dstID'] > $data['srcID']) {
+      // retain contact with lower id
+      $doSwap = TRUE;
+    }
+    if ($doSwap) {
+      $tempID = $data['srcID'];
+      $data['srcID'] = $data['dstID'];
+      $data['dstID'] = $tempID;
+    }
+  }
+
+  if ($type == 'batch') {
+    $conflicts = &$data['fields_in_conflict'];
+    $fieldsToAbort = array('move_rel_table_users');
+    if (!empty(array_intersect($fieldsToAbort, array_keys($conflicts)))) {
+      // Do not proceed with merge. Return with conflicts present.
+      return;
+    }
+
+    // Fields we assume we dont need to merge in case of conflict. 
+    // We have already made sure that the contact we retaining ($mainId) is the one with ID & externalID that we want to keep
+    $fieldsToSkip  = array('move_external_identifier');
+
+    $migrationInfo = &$data['old_migration_info'];
+    foreach ($conflicts as $key => &$val) {
+      if (in_array($key, $fieldsToSkip) || $otherId < $mainId) {
+        // IF main contact is newest OR we don't want to proceed with merge for this column, 
+        // THEN we keep the value of main contact, by not doing any merge for this column
+        unset($conflicts[$key]);
+      } else if ($otherId > $mainId) { // If duplicate contact is newest
+        // we consider value from newest contact, which we can figure out from $migrationInfo
+        $val = $migrationInfo[$key];
+      }
+    }
+  }
+}
