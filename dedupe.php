@@ -133,7 +133,8 @@ function dedupe_civicrm_merge($type, &$data, $mainId, $otherId, $tables) {
   if ($type == 'batch') {
     $conflicts = &$data['fields_in_conflict'];
     $fieldsToAbort = array('move_rel_table_users');
-    if (!empty(array_intersect($fieldsToAbort, array_keys($conflicts)))) {
+    $fieldsToAbort = array_intersect($fieldsToAbort, array_keys($conflicts));
+    if (!empty($fieldsToAbort)) {
       // Do not proceed with merge. Return with conflicts present.
       return;
     }
@@ -151,6 +152,134 @@ function dedupe_civicrm_merge($type, &$data, $mainId, $otherId, $tables) {
       } else if ($otherId > $mainId) { // If duplicate contact is newest
         // we consider value from newest contact, which we can figure out from $migrationInfo
         $val = $migrationInfo[$key];
+      }
+    }
+  }
+}
+
+function dedupe_civicrm_dupeQuery($form, $type, &$data) {
+  if ($type == 'supportedFields' && !empty($data)) {
+    $data['Individual']['civicrm_contact']['custom_first_last'] = "Custom: First Name AND Last Name";
+    $data['Individual']['civicrm_contact']['custom_first_last_email'] = "Custom: First Name AND Last Name AND Email";
+    $data['Individual']['civicrm_contact']['custom_first_last_phone'] = "Custom: First Name AND Last Name AND Phone";
+    $data['Individual']['civicrm_contact']['custom_first_last_postcode'] = "Custom: First Name AND Last Name AND Postal Code";
+    $data['Individual']['civicrm_contact']['custom_prefix_last_email']     = "Custom: Prefix AND Last Name AND Email";
+    $data['Individual']['civicrm_contact']['custom_prefix_last_postcode']  = "Custom: Prefix AND Last Name AND Postal Code";
+  }
+  if ($type == 'dedupeIndexes' && !empty($data)) {
+    foreach ($data['civicrm_contact'] as $key => $val) {
+      if (in_array($val, 
+          array('custom_first_last',
+            'custom_first_last_phone', 
+            'custom_first_last_email', 
+            'custom_first_last_postcode',
+            'custom_prefix_last_email',
+            'custom_prefix_last_postcode'))) {
+        unset($data['civicrm_contact'][$key]);
+        break;
+      }
+    }
+  }
+  if ($type == 'table' && !empty($data)) {
+    foreach ($data as $key => &$query) {
+      list($table, $col, $wt) = explode('.', $key);
+      if ($table == 'civicrm_contact' && $col == 'custom_first_last') {
+        $data[$key] = "
+    SELECT t1.id id1, t2.id id2, $wt weight 
+      FROM civicrm_contact t1
+      JOIN civicrm_contact t2 ON t1.first_name = t2.first_name AND t1.last_name = t2.last_name
+     WHERE t1.contact_type = 'Individual' AND 
+           t2.contact_type = 'Individual' AND 
+           t1.id < t2.id AND 
+           t1.first_name IS NOT NULL AND 
+           t1.last_name  IS NOT NULL";
+      }
+      if ($table == 'civicrm_contact' && $col == 'custom_first_last_email') {
+        $data[$key] = "
+    SELECT t1.id id1, t2.id id2, $wt weight 
+      FROM civicrm_contact t1
+INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
+      JOIN ( SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, em2.email 
+               FROM civicrm_contact cc
+         INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id ) t2 ON t1.first_name = t2.first_name AND 
+                                                                        t1.last_name = t2.last_name AND 
+                                                                        em1.email = t2.email
+     WHERE t1.contact_type = 'Individual' AND 
+           t2.contact_type = 'Individual' AND 
+           t1.id < t2.id AND 
+           t1.first_name IS NOT NULL AND 
+           t1.last_name  IS NOT NULL AND 
+           em1.email IS NOT NULL";
+      }
+      if ($table == 'civicrm_contact' && $col == 'custom_first_last_phone') {
+        $data[$key] = "
+    SELECT t1.id id1, t2.id id2, $wt weight 
+      FROM civicrm_contact t1
+INNER JOIN civicrm_phone ph1 ON t1.id = ph1.contact_id 
+      JOIN ( SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, ph2.phone 
+               FROM civicrm_contact cc
+         INNER JOIN civicrm_phone ph2 ON cc.id = ph2.contact_id ) t2 ON t1.first_name = t2.first_name AND 
+                                                                        t1.last_name = t2.last_name AND 
+                                                                        ph1.phone = t2.phone
+     WHERE t1.contact_type = 'Individual' AND 
+           t2.contact_type = 'Individual' AND 
+           t1.id < t2.id AND 
+           t1.first_name IS NOT NULL AND 
+           t1.last_name  IS NOT NULL AND 
+           ph1.phone IS NOT NULL";
+      }
+      if ($table == 'civicrm_contact' && $col == 'custom_first_last_postcode') {
+        $data[$key] = "
+    SELECT t1.id id1, t2.id id2, $wt weight 
+      FROM civicrm_contact t1
+INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
+      JOIN ( SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, adr2.postal_code, adr2.location_type_id 
+               FROM civicrm_contact cc
+         INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id ) t2 ON t1.first_name    = t2.first_name  AND 
+                                                                            t1.last_name     = t2.last_name   AND 
+                                                                            adr1.postal_code = t2.postal_code AND 
+                                                                            adr1.location_type_id = t2.location_type_id
+     WHERE t1.contact_type = 'Individual' AND 
+           t2.contact_type = 'Individual' AND 
+           t1.id < t2.id AND 
+           t1.first_name IS NOT NULL AND 
+           t1.last_name  IS NOT NULL AND 
+           adr1.postal_code IS NOT NULL";
+      }
+      if ($table == 'civicrm_contact' && $col == 'custom_prefix_last_email') {
+        $data[$key] = "
+    SELECT t1.id id1, t2.id id2, $wt weight 
+      FROM civicrm_contact t1
+INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
+      JOIN ( SELECT cc.id, cc.prefix_id, cc.last_name, cc.contact_type, em2.email 
+               FROM civicrm_contact cc
+         INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id ) t2 ON t1.prefix_id = t2.prefix_id AND 
+                                                                        t1.last_name = t2.last_name AND 
+                                                                        em1.email = t2.email
+     WHERE t1.contact_type = 'Individual' AND 
+           t2.contact_type = 'Individual' AND 
+           t1.id < t2.id AND 
+           t1.prefix_id IS NOT NULL AND 
+           t1.last_name IS NOT NULL AND 
+           em1.email IS NOT NULL";
+      }
+      if ($table == 'civicrm_contact' && $col == 'custom_prefix_last_postcode') {
+        $data[$key] = "
+    SELECT t1.id id1, t2.id id2, $wt weight 
+      FROM civicrm_contact t1
+INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
+      JOIN ( SELECT cc.id, cc.prefix_id, cc.last_name, cc.contact_type, adr2.postal_code, adr2.location_type_id 
+               FROM civicrm_contact cc
+         INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id ) t2 ON t1.prefix_id     = t2.prefix_id  AND 
+                                                                            t1.last_name     = t2.last_name   AND 
+                                                                            adr1.postal_code = t2.postal_code AND 
+                                                                            adr1.location_type_id = t2.location_type_id
+     WHERE t1.contact_type = 'Individual' AND 
+           t2.contact_type = 'Individual' AND 
+           t1.id < t2.id AND 
+           t1.prefix_id IS NOT NULL AND 
+           t1.last_name IS NOT NULL AND 
+           adr1.postal_code IS NOT NULL";
       }
     }
   }
