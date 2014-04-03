@@ -119,20 +119,33 @@ function dedupe_civicrm_merge($type, &$data, $mainId, $otherId, $tables) {
     if ($SrcCount > $dstCount) {
       // keep contact with max contributions as destination (contact to be retained)
       $doSwap = TRUE;
-    } else if ($data['dstID'] > $data['srcID']) {
-      // retain contact with lower id
-      $doSwap = TRUE;
     }
+    // we 'll add some more logic here to decide biasing
+
     if ($doSwap) {
       $tempID = $data['srcID'];
       $data['srcID'] = $data['dstID'];
       $data['dstID'] = $tempID;
     }
+    $data['auto_flip'] = FALSE;
   }
-
+  
   if ($type == 'batch') {
+    static $mailingBlockID = NULL;
+    if (!$mailingBlockID) {
+      $mailingBlockID = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_CustomGroup', 'Mailing Blocks', 'id', 'title');
+    }
+
     $conflicts = &$data['fields_in_conflict'];
-    $fieldsToAbort = array('move_rel_table_users');
+    $fieldsToAbort = 
+      array('move_rel_table_users', 
+        'move_do_not_phone', 
+        'move_do_not_email', 
+        'move_do_not_mail', 
+        'move_do_not_sms', 
+        'move_do_not_trade', 
+        'move_is_opt_out',
+        "move_custom_{$mailingBlockID}");
     $fieldsToAbort = array_intersect($fieldsToAbort, array_keys($conflicts));
     if (!empty($fieldsToAbort)) {
       // Do not proceed with merge. Return with conflicts present.
@@ -167,6 +180,7 @@ function dedupe_civicrm_dupeQuery($form, $type, &$data) {
     $data['Individual']['civicrm_contact']['custom_initial_last_postcode'] = "Custom: Initial AND Last Name AND Postal Code";
     $data['Individual']['civicrm_contact']['custom_prefix_last_email']     = "Custom: Prefix AND Last Name AND Email";
     $data['Individual']['civicrm_contact']['custom_prefix_last_postcode']  = "Custom: Prefix AND Last Name AND Postal Code";
+    $data['Individual']['civicrm_contact']['custom_prefix_initial_last_email'] = "Custom: Prefix AND Initial AND Last Name AND Email";
   }
   if ($type == 'dedupeIndexes' && !empty($data)) {
     foreach ($data['civicrm_contact'] as $key => $val) {
@@ -178,9 +192,9 @@ function dedupe_civicrm_dupeQuery($form, $type, &$data) {
             'custom_prefix_last_email',
             'custom_prefix_last_postcode',
             'custom_initial_last_email',
-            'custom_initial_last_postcode'))) {
+            'custom_initial_last_postcode',
+            'custom_prefix_initial_last_email'))) {
         unset($data['civicrm_contact'][$key]);
-        break;
       }
     }
   }
@@ -319,6 +333,25 @@ INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id
            t1.first_name IS NOT NULL AND 
            t1.last_name  IS NOT NULL AND 
            adr1.postal_code IS NOT NULL AND adr1.postal_code <> ''";
+      }
+      if ($table == 'civicrm_contact' && $col == 'custom_prefix_initial_last_email') {
+        $data[$key] = "
+    SELECT t1.id id1, t2.id id2, $wt weight 
+      FROM civicrm_contact t1
+INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
+      JOIN ( SELECT cc.id, cc.prefix_id, cc.first_name, cc.last_name, cc.contact_type, em2.email 
+               FROM civicrm_contact cc
+         INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id ) t2 ON t1.prefix_id = t2.prefix_id AND 
+                                                                        SUBSTR(t1.first_name, 1, 1) = SUBSTR(t2.first_name, 1, 1) AND
+                                                                        t1.last_name = t2.last_name AND 
+                                                                        em1.email = t2.email
+     WHERE t1.contact_type = 'Individual' AND 
+           t2.contact_type = 'Individual' AND 
+           t1.id < t2.id AND 
+           t1.prefix_id IS NOT NULL AND
+           t1.first_name IS NOT NULL AND 
+           t1.last_name IS NOT NULL AND 
+           em1.email IS NOT NULL";
       }
     }
   }
