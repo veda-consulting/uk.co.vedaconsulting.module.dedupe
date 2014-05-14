@@ -355,4 +355,28 @@ INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id
       }
     }
   }
+  // make sure custom queries are executed first
+  if ($type == 'tableCount' && !empty($data)) {
+    $customQuery = array();
+    foreach ($data as $key => &$query) {
+      list($table, $col, $wt) = explode('.', $key);
+      if (in_array($col, 
+        array('custom_first_last',
+        'custom_first_last_phone', 
+        'custom_first_last_email', 
+        'custom_first_last_postcode',
+        'custom_prefix_last_email',
+        'custom_prefix_last_postcode',
+        'custom_initial_last_email',
+        'custom_initial_last_postcode',
+        'custom_prefix_initial_last_email'
+      ))) {
+        $customQuery = array($key => $query);
+        unset($data[$key]);
+      }
+    }
+    if (!empty($customQuery)) {
+      $data = array_merge($customQuery, $data);
+    }
+  }
 }

@@ -207,6 +207,7 @@ class CRM_Dedupe_BAO_RuleGroup extends CRM_Dedupe_DAO_RuleGroup {
       if ($isInclusive) {
         // order queries by table count
         self::orderByTableCount($tableQueries);
+        CRM_Utils_Hook::dupeQuery($this, 'tableCount', $tableQueries);
 
         $weightSum = array_sum($exclWeightSum);
         $searchWithinDupes = !empty($exclWeightSum) ? 1 : 0;
@@ -235,10 +236,11 @@ class CRM_Dedupe_BAO_RuleGroup extends CRM_Dedupe_DAO_RuleGroup {
           // FIXME: we need to be more acurate with affected rows, especially for insert vs duplicate insert.
           // And that will help optimize further.
           $affectedRows = $dao->affectedRows();
+          $mar = mysql_affected_rows();
           $dao->free();
 
           // In an inclusive situation, failure of any query means no further processing -
-          if ($affectedRows == 0) {
+          if ($affectedRows == 0 && $mar == 0) {
             // reset to make sure no further execution is done.
             $tableQueries = array();
             break;
@@ -254,7 +256,8 @@ class CRM_Dedupe_BAO_RuleGroup extends CRM_Dedupe_DAO_RuleGroup {
         $query       = array_shift($tableQueries);
         $query       = "{$insertClause} {$query} {$groupByClause} ON DUPLICATE KEY UPDATE weight = weight + VALUES(weight)";
         $dao->query($query);
-        if ($dao->affectedRows() >= 1) {
+        $mar = mysql_affected_rows();
+        if ($dao->affectedRows() >= 1 || $mar >= 1) {
           $exclWeightSum[] = substr($fieldWeight, strrpos($fieldWeight, '.') + 1);
         }
         $dao->free();
