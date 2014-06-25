@@ -731,6 +731,8 @@ INNER JOIN  civicrm_membership membership2 ON membership1.membership_type_id = m
     $migrationData['fields_in_conflict'] = $conflicts;
     CRM_Utils_Hook::merge('batch', $migrationData, $mainId, $otherId);
     $conflicts = $migrationData['fields_in_conflict'];
+    // allow hook to override / manipulate migrationInfo as well
+    $migrationInfo = $migrationData['old_migration_info'];
 
     if (!empty($conflicts)) {
       foreach ($conflicts as $key => $val) {

@@ -113,14 +113,25 @@ function dedupe_civicrm_alterSettingsFolders(&$metaDataFolders = NULL) {
 function dedupe_civicrm_merge($type, &$data, $mainId, $otherId, $tables) {
   if ($type == 'flip') {
     $doSwap = FALSE;
-    $query  = "SELECT count(*) FROM civicrm_contribution WHERE contact_id = %1";
-    $SrcCount = CRM_Core_DAO::singleValueQuery($query, array(1 => array($data['srcID'], 'Integer')));
-    $dstCount = CRM_Core_DAO::singleValueQuery($query, array(1 => array($data['dstID'], 'Integer')));
-    if ($SrcCount > $dstCount) {
-      // keep contact with max contributions as destination (contact to be retained)
-      $doSwap = TRUE;
+
+    $query  = "SELECT is_deceased FROM civicrm_contact WHERE id = %1";
+    $isSourceDeceased = CRM_Core_DAO::singleValueQuery($query, array(1 => array($data['srcID'], 'Integer')));
+    $isDestinationDeceased = CRM_Core_DAO::singleValueQuery($query, array(1 => array($data['dstID'], 'Integer')));
+    if ($isSourceDeceased xor $isDestinationDeceased) {
+      // if any one of the contact is deceased 
+      if ($isSourceDeceased) {
+        // retain deceased contact
+        $doSwap = TRUE;
+      }
+    } else {
+      $query  = "SELECT count(*) FROM civicrm_contribution WHERE contact_id = %1";
+      $SrcCount = CRM_Core_DAO::singleValueQuery($query, array(1 => array($data['srcID'], 'Integer')));
+      $dstCount = CRM_Core_DAO::singleValueQuery($query, array(1 => array($data['dstID'], 'Integer')));
+      if ($SrcCount > $dstCount) {
+        // keep contact with max contributions as destination (contact to be retained)
+        $doSwap = TRUE;
+      }
     }
-    // we 'll add some more logic here to decide biasing
 
     if ($doSwap) {
       $tempID = $data['srcID'];
@@ -131,9 +142,10 @@ function dedupe_civicrm_merge($type, &$data, $mainId, $otherId, $tables) {
   }
   
   if ($type == 'batch') {
-    static $mailingBlockID = NULL;
+    static $mailingBlockID = NULL, $mailingBlockSegID = NULL;
     if (!$mailingBlockID) {
-      $mailingBlockID = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_CustomGroup', 'Mailing Blocks', 'id', 'title');
+      $mailingBlockID    = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_CustomField', 'Blocks', 'id', 'name');
+      $mailingBlockSegID = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_CustomField', 'New_Blocks', 'id', 'name');
     }
 
     $conflicts = &$data['fields_in_conflict'];
@@ -145,7 +157,9 @@ function dedupe_civicrm_merge($type, &$data, $mainId, $otherId, $tables) {
         'move_do_not_sms', 
         'move_do_not_trade', 
         'move_is_opt_out',
-        "move_custom_{$mailingBlockID}");
+        "move_custom_{$mailingBlockID}",
+        "move_custom_{$mailingBlockSegID}",
+      );
     $fieldsToAbort = array_intersect($fieldsToAbort, array_keys($conflicts));
     if (!empty($fieldsToAbort)) {
       // Do not proceed with merge. Return with conflicts present.
@@ -158,13 +172,22 @@ function dedupe_civicrm_merge($type, &$data, $mainId, $otherId, $tables) {
 
     $migrationInfo = &$data['old_migration_info'];
     foreach ($conflicts as $key => &$val) {
-      if (in_array($key, $fieldsToSkip) || $otherId < $mainId) {
-        // IF main contact is newest OR we don't want to proceed with merge for this column, 
-        // THEN we keep the value of main contact, by not doing any merge for this column
-        unset($conflicts[$key]);
-      } else if ($otherId > $mainId) { // If duplicate contact is newest
-        // we consider value from newest contact, which we can figure out from $migrationInfo
-        $val = $migrationInfo[$key];
+      if (in_array($key, $fieldsToSkip)) {
+        // in case of conflict preserve that of main contact
+        unset($conflicts[$key], $migrationInfo[$key]);
+      }
+    }
+
+    // do not merge cms user if main contact already has one
+    $srcUserId  = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_UFMatch', $mainId, 'uf_id', 'contact_id');
+    if ($srcUserId && $migrationInfo['move_rel_table_users'] == 1) {
+      $migrationInfo['move_rel_table_users'] = 0;
+    }
+
+    // if any other data has empty value, make sure we don't merge it
+    foreach ($migrationInfo['rows'] as $movKey => $movVal) {
+      if ($movVal['other'] === '' || $movVal['other'] === NULL) {
+        unset($migrationInfo[$movKey]);
       }
     }
   }
