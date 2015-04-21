@@ -1,9 +1,9 @@
 <?php
 /*
  +--------------------------------------------------------------------+
- | CiviCRM version 4.3                                                |
+ | CiviCRM version 4.5                                                |
  +--------------------------------------------------------------------+
- | Copyright CiviCRM LLC (c) 2004-2013                                |
+ | Copyright CiviCRM LLC (c) 2004-2014                                |
  +--------------------------------------------------------------------+
  | This file is a part of CiviCRM.                                    |
  |                                                                    |
@@ -28,7 +28,7 @@
 /**
  *
  * @package CRM
- * @copyright CiviCRM LLC (c) 2004-2013
+ * @copyright CiviCRM LLC (c) 2004-2014
  * $Id$
  *
  */
@@ -82,8 +82,7 @@ class CRM_Dedupe_BAO_RuleGroup extends CRM_Dedupe_DAO_RuleGroup {
         'civicrm_im', 'civicrm_note', 'civicrm_openid', 'civicrm_phone',
       );
 
-      foreach (array(
-        'Individual', 'Organization', 'Household') as $ctype) {
+      foreach (array('Individual', 'Organization', 'Household') as $ctype) {
         // take the table.field pairs and their titles from importableFields() if the table is supported
         foreach (CRM_Contact_BAO_Contact::importableFields($ctype) as $iField) {
           if (isset($iField['where'])) {
@@ -207,7 +206,6 @@ class CRM_Dedupe_BAO_RuleGroup extends CRM_Dedupe_DAO_RuleGroup {
       if ($isInclusive) {
         // order queries by table count
         self::orderByTableCount($tableQueries);
-        CRM_Utils_Hook::dupeQuery($this, 'tableCount', $tableQueries);
 
         $weightSum = array_sum($exclWeightSum);
         $searchWithinDupes = !empty($exclWeightSum) ? 1 : 0;
@@ -271,6 +269,13 @@ class CRM_Dedupe_BAO_RuleGroup extends CRM_Dedupe_DAO_RuleGroup {
 
   // Function to determine if a given query set contains inclusive or exclusive set of weights.
   // The function assumes that the query set is already ordered by weight in desc order.
+  /**
+   * @param $tableQueries
+   * @param $threshold
+   * @param array $exclWeightSum
+   *
+   * @return array
+   */
   static function isQuerySetInclusive($tableQueries, $threshold, $exclWeightSum = array(
     )) {
     $input = array();
@@ -305,6 +310,9 @@ class CRM_Dedupe_BAO_RuleGroup extends CRM_Dedupe_DAO_RuleGroup {
   }
 
   // sort queries by number of records for the table associated with them
+  /**
+   * @param $tableQueries
+   */
   static function orderByTableCount(&$tableQueries) {
     static $tableCount = array();
 
@@ -372,15 +380,22 @@ class CRM_Dedupe_BAO_RuleGroup extends CRM_Dedupe_DAO_RuleGroup {
   /**
    * To find fields related to a rule group.
    *
-   * @param array contains the rule group property to identify rule group
+   * @param $params
    *
-   * @return (rule field => weight) array and threshold associated to rule group
-   * @access public
+   * @internal param \contains $array the rule group property to identify rule group
+   *
+   * @return array (rule field => weight) array and threshold associated to rule group@access public
    */
   static function dedupeRuleFieldsWeight($params) {
     $rgBao               = new CRM_Dedupe_BAO_RuleGroup();
-    $rgBao->used         = $params['used'];
     $rgBao->contact_type = $params['contact_type'];
+    if (CRM_Utils_Array::value('id', $params)) {
+      // accept an ID if provided
+      $rgBao->id = $params['id'];
+    }
+    else {
+      $rgBao->used = $params['used'];
+    }
     $rgBao->find(TRUE);
 
     $ruleBao = new CRM_Dedupe_BAO_Rule();
@@ -392,6 +407,25 @@ class CRM_Dedupe_BAO_RuleGroup extends CRM_Dedupe_DAO_RuleGroup {
     }
 
     return array($ruleFields, $rgBao->threshold);
+  }
+
+  /**
+   * Get all of the combinations of fields that would work with a rule
+   */
+
+  static function combos($rgFields, $threshold, &$combos, $running = array()) {
+    foreach ($rgFields as $rgField => $weight) {
+      unset($rgFields[$rgField]);
+      $diff = $threshold - $weight;
+      $runningnow = $running;
+      $runningnow[] = $rgField;
+      if ($diff > 0) {
+        self::combos($rgFields, $diff, $combos, $runningnow);
+      }
+      else {
+        $combos[] = $runningnow;
+      }
+    }
   }
 
   /**
