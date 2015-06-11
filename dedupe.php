@@ -303,244 +303,353 @@ function dedupe_civicrm_dupeQuery($form, $type, &$data) {
       if ($table == 'civicrm_contact' && $col == 'custom_first_last') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-      JOIN civicrm_contact t2 ON t1.first_name = t2.first_name AND t1.last_name = t2.last_name
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           t1.first_name IS NOT NULL AND 
-           t1.last_name  IS NOT NULL";
+    FROM
+        civicrm_contact t1
+        INNER JOIN civicrm_contact t2 ON t1.first_name = t2.first_name AND t1.last_name = t2.last_name
+    WHERE
+        t1.contact_type = 'Individual' AND 
+        t2.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        t1.first_name IS NOT NULL AND 
+        t1.last_name  IS NOT NULL";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_first_last_email') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
-      JOIN ( SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, em2.email 
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id ) t2 ON t1.first_name = t2.first_name AND 
-                                                                        t1.last_name = t2.last_name AND 
-                                                                        em1.email = t2.email
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           t1.first_name IS NOT NULL AND 
-           t1.last_name  IS NOT NULL AND 
-           em1.email IS NOT NULL AND em1.email <> ''";
+    FROM 
+        civicrm_contact t1
+        INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, em2.email 
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.first_name IS NOT NULL AND
+                        cc.last_name IS NOT NULL
+                        ) t2 ON t1.first_name = t2.first_name AND 
+                                t1.last_name = t2.last_name AND 
+                                em1.email = t2.email
+    WHERE 
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        t1.first_name IS NOT NULL AND 
+        t1.last_name  IS NOT NULL AND 
+        em1.email > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_first_last_phone') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_phone ph1 ON t1.id = ph1.contact_id 
-      JOIN ( SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, ph2.phone 
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_phone ph2 ON cc.id = ph2.contact_id ) t2 ON t1.first_name = t2.first_name AND 
-                                                                        t1.last_name = t2.last_name AND 
-                                                                        REPLACE(ph1.phone, ' ', '') = REPLACE(t2.phone, ' ', '')
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           t1.first_name IS NOT NULL AND 
-           t1.last_name  IS NOT NULL AND 
-           ph1.phone IS NOT NULL AND ph1.phone <> ''";
+    FROM
+        civicrm_contact t1
+        INNER JOIN civicrm_phone ph1 ON t1.id = ph1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, ph2.phone 
+                    FROM 
+                        civicrm_contact cc
+                        INNER JOIN civicrm_phone ph2 ON cc.id = ph2.contact_id 
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.first_name IS NOT NULL AND
+                        cc.last_name IS NOT NULL AND
+                        ph2.phone > ''
+                    ) t2 ON t1.first_name = t2.first_name AND 
+                            t1.last_name = t2.last_name AND 
+                            REPLACE(ph1.phone, ' ', '') = REPLACE(t2.phone, ' ', '')
+    WHERE 
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        t1.first_name IS NOT NULL AND 
+        t1.last_name  IS NOT NULL AND 
+        ph1.phone > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_first_last_postcode') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
-      JOIN ( SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, adr2.postal_code
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id ) t2 ON t1.first_name    = t2.first_name  AND 
-                                                                            t1.last_name     = t2.last_name   AND 
-                                                                            adr1.postal_code = t2.postal_code
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           t1.first_name IS NOT NULL AND 
-           t1.last_name  IS NOT NULL AND 
-           adr1.postal_code IS NOT NULL AND adr1.postal_code <> ''";
+    FROM 
+        civicrm_contact t1
+        INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, adr2.postal_code
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.first_name IS NOT NULL AND
+                        cc.last_name IS NOT NULL AND
+                        adr2.postal_code > ''
+                    ) t2 ON t1.first_name = t2.first_name AND 
+                            t1.last_name = t2.last_name AND
+                            adr1.postal_code = t2.postal_code
+    WHERE
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        t1.first_name IS NOT NULL AND 
+        t1.last_name  IS NOT NULL AND 
+        adr1.postal_code > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_prefix_last_email') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
-      JOIN ( SELECT cc.id, cc.prefix_id, cc.last_name, cc.contact_type, em2.email 
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id ) t2 ON t1.prefix_id = t2.prefix_id AND 
-                                                                        t1.last_name = t2.last_name AND 
-                                                                        em1.email = t2.email
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           t1.prefix_id IS NOT NULL AND 
-           t1.last_name IS NOT NULL AND 
-           em1.email IS NOT NULL AND em1.email <> ''";
+    FROM
+        civicrm_contact t1
+        INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.prefix_id, cc.last_name, cc.contact_type, em2.email 
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id 
+                    WHERE 
+                        cc.contact_type = 'Individual' AND
+                        cc.first_name IS NOT NULL AND
+                        cc.last_name IS NOT NULL AND
+                        em2.email > ''
+                     ) t2 ON t1.prefix_id = t2.prefix_id AND 
+                             t1.last_name = t2.last_name AND 
+                             em1.email = t2.email
+     WHERE
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        t1.prefix_id IS NOT NULL AND 
+        t1.last_name IS NOT NULL AND 
+        em1.email > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_prefix_last_postcode') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
-      JOIN ( SELECT cc.id, cc.prefix_id, cc.last_name, cc.contact_type, adr2.postal_code
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id ) t2 ON t1.prefix_id     = t2.prefix_id   AND 
-                                                                            t1.last_name     = t2.last_name   AND 
-                                                                            adr1.postal_code = t2.postal_code
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           t1.prefix_id IS NOT NULL AND 
-           t1.last_name IS NOT NULL AND 
-           adr1.postal_code IS NOT NULL AND adr1.postal_code <> ''";
+    FROM
+        civicrm_contact t1
+        INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.prefix_id, cc.last_name, cc.contact_type, adr2.postal_code
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.first_name IS NOT NULL AND
+                        cc.last_name IS NOT NULL AND
+                        adr2.postal_code > ''
+                    ) t2 ON t1.prefix_id = t2.prefix_id AND 
+                            t1.last_name = t2.last_name AND 
+                            adr1.postal_code = t2.postal_code
+     WHERE
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        t1.prefix_id IS NOT NULL AND 
+        t1.last_name IS NOT NULL AND 
+        adr1.postal_code > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_initial_last_email') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
-      JOIN ( SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, em2.email 
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id ) t2 ON t1.first_name = t2.first_name AND
-                                                                        t1.last_name = t2.last_name AND 
-                                                                        em1.email = t2.email
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           CHAR_LENGTH(t1.first_name) = 1 AND
-           t1.last_name  IS NOT NULL AND 
-           em1.email IS NOT NULL AND em1.email <> ''";
+    FROM
+        civicrm_contact t1
+        INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, em2.email 
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.last_name IS NOT NULL AND
+                        CHAR_LENGTH(cc.first_name) = 1 AND
+                        em2.email > ''
+                    ) t2 ON t1.first_name = t2.first_name AND
+                            t1.last_name = t2.last_name AND 
+                            em1.email = t2.email
+     WHERE
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        CHAR_LENGTH(t1.first_name) = 1 AND
+        t1.last_name  IS NOT NULL AND 
+        em1.email > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_initial_last_email_dob') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
-      JOIN ( SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, cc.birth_date, em2.email 
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id ) t2 ON t1.first_name = t2.first_name AND
-                                                                        t1.last_name = t2.last_name   AND 
-                                                                        t1.birth_date = t2.birth_date AND
-                                                                        em1.email = t2.email
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           CHAR_LENGTH(t1.first_name) = 1 AND
-           t1.last_name  IS NOT NULL AND 
-           t1.birth_date IS NOT NULL AND 
-           em1.email IS NOT NULL AND em1.email <> ''";
+    FROM
+        civicrm_contact t1
+        INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, cc.birth_date, em2.email 
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.last_name IS NOT NULL AND
+                        CHAR_LENGTH(cc.first_name) = 1 AND
+                        cc.birth_date IS NOT NULL AND
+                        em2.email > ''
+                    ) t2 ON t1.first_name = t2.first_name AND
+                            t1.last_name = t2.last_name AND 
+                            t1.birth_date = t2.birth_date AND
+                            em1.email = t2.email
+     WHERE
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        CHAR_LENGTH(t1.first_name) = 1 AND
+        t1.last_name  IS NOT NULL AND 
+        t1.birth_date IS NOT NULL AND 
+        em1.email > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_initial_last_postcode') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
-      JOIN ( SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, adr2.postal_code
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id ) t2 ON t1.first_name    = t2.first_name AND
-                                                                            t1.last_name     = t2.last_name  AND 
-                                                                            adr1.postal_code = t2.postal_code
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           CHAR_LENGTH(t1.first_name) = 1 AND
-           t1.last_name  IS NOT NULL AND 
-           adr1.postal_code IS NOT NULL AND adr1.postal_code <> ''";
+    FROM
+        civicrm_contact t1
+        INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, adr2.postal_code
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id 
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.last_name IS NOT NULL AND
+                        CHAR_LENGTH(cc.first_name) = 1 AND
+                        adr2.postal_code > ''
+                    ) t2 ON t1.first_name = t2.first_name AND
+                            t1.last_name = t2.last_name AND 
+                            adr1.postal_code = t2.postal_code
+    WHERE
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        CHAR_LENGTH(t1.first_name) = 1 AND
+        t1.last_name  IS NOT NULL AND 
+        adr1.postal_code > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_initial_last_postcode_dob') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
-      JOIN ( SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, cc.birth_date, adr2.postal_code
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id ) t2 ON t1.first_name    = t2.first_name AND
-                                                                            t1.last_name     = t2.last_name  AND 
-                                                                            t1.birth_date    = t2.birth_date AND
-                                                                            adr1.postal_code = t2.postal_code
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           CHAR_LENGTH(t1.first_name) = 1 AND
-           t1.last_name  IS NOT NULL AND 
-           t1.birth_date IS NOT NULL AND 
-           adr1.postal_code IS NOT NULL AND adr1.postal_code <> ''";
+    FROM 
+        civicrm_contact t1
+        INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, cc.birth_date, adr2.postal_code
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id 
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.last_name IS NOT NULL AND
+                        CHAR_LENGTH(cc.first_name) = 1 AND
+                        adr2.postal_code > ''
+                    ) t2 ON t1.first_name = t2.first_name AND
+                            t1.last_name = t2.last_name AND 
+                            t1.birth_date = t2.birth_date AND
+                            adr1.postal_code = t2.postal_code
+     WHERE
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        CHAR_LENGTH(t1.first_name) = 1 AND
+        t1.last_name  IS NOT NULL AND 
+        t1.birth_date IS NOT NULL AND 
+        adr1.postal_code > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_initial_last_phone') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_phone ph1 ON t1.id = ph1.contact_id 
-      JOIN ( SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, ph2.phone 
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_phone ph2 ON cc.id = ph2.contact_id ) t2 ON t1.first_name = t2.first_name AND
-                                                                        t1.last_name  = t2.last_name AND 
-                                                                        REPLACE(ph1.phone, ' ', '') = REPLACE(t2.phone, ' ', '')
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           CHAR_LENGTH(t1.first_name) = 1 AND
-           t1.last_name  IS NOT NULL AND 
-           ph1.phone IS NOT NULL AND ph1.phone <> ''";
+    FROM
+        civicrm_contact t1
+        INNER JOIN civicrm_phone ph1 ON t1.id = ph1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.first_name, cc.last_name, cc.contact_type, ph2.phone 
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_phone ph2 ON cc.id = ph2.contact_id
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.last_name IS NOT NULL AND
+                        CHAR_LENGTH(cc.first_name) = 1 AND
+                        ph2.phone > ''
+                    ) t2 ON t1.first_name = t2.first_name AND
+                            t1.last_name = t2.last_name AND 
+                            REPLACE(ph1.phone, ' ', '') = REPLACE(t2.phone, ' ', '')
+    WHERE
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        CHAR_LENGTH(t1.first_name) = 1 AND
+        t1.last_name  IS NOT NULL AND 
+        ph1.phone > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_prefix_initial_last_email') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
-      JOIN ( SELECT cc.id, cc.prefix_id, cc.first_name, cc.last_name, cc.contact_type, em2.email 
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id ) t2 ON t1.prefix_id = t2.prefix_id AND 
-                                                                        t1.first_name = t2.first_name AND
-                                                                        t1.last_name = t2.last_name AND 
-                                                                        em1.email = t2.email
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           t1.prefix_id IS NOT NULL AND
-           CHAR_LENGTH(t1.first_name) = 1 AND
-           t1.last_name IS NOT NULL AND 
-           em1.email IS NOT NULL AND em1.email <> ''";
+    FROM
+        civicrm_contact t1
+        INNER JOIN civicrm_email em1 ON t1.id = em1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.prefix_id, cc.first_name, cc.last_name, cc.contact_type, em2.email 
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_email em2 ON cc.id = em2.contact_id
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.last_name IS NOT NULL AND
+                        CHAR_LENGTH(cc.first_name) = 1 AND
+                        cc.prefix_id IS NOT NULL AND
+                        em2.email > ''
+                    ) t2 ON t1.prefix_id = t2.prefix_id AND 
+                            t1.first_name = t2.first_name AND
+                            t1.last_name = t2.last_name AND 
+                            em1.email = t2.email
+    WHERE
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        t1.prefix_id IS NOT NULL AND
+        CHAR_LENGTH(t1.first_name) = 1 AND
+        t1.last_name IS NOT NULL AND 
+        em1.email > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_prefix_initial_last_postcode') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
-      JOIN ( SELECT cc.id, cc.prefix_id, cc.first_name, cc.last_name, cc.contact_type, adr2.postal_code
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id ) t2 ON t1.prefix_id = t2.prefix_id AND 
-                                                                            t1.first_name = t2.first_name AND
-                                                                            t1.last_name     = t2.last_name   AND 
-                                                                            adr1.postal_code = t2.postal_code
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           t1.prefix_id IS NOT NULL AND
-           CHAR_LENGTH(t1.first_name) = 1 AND
-           t1.last_name IS NOT NULL AND 
-           adr1.postal_code IS NOT NULL AND adr1.postal_code <> ''";
+    FROM 
+        civicrm_contact t1
+        INNER JOIN civicrm_address adr1 ON t1.id = adr1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.prefix_id, cc.first_name, cc.last_name, cc.contact_type, adr2.postal_code
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_address adr2 ON cc.id = adr2.contact_id
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.last_name IS NOT NULL AND
+                        CHAR_LENGTH(cc.first_name) = 1 AND
+                        cc.prefix_id IS NOT NULL AND
+                        adr2.postal_code > ''                        
+                    ) t2 ON t1.prefix_id = t2.prefix_id AND 
+                            t1.first_name = t2.first_name AND
+                            t1.last_name = t2.last_name AND 
+                            adr1.postal_code = t2.postal_code
+    WHERE
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        t1.prefix_id IS NOT NULL AND
+        CHAR_LENGTH(t1.first_name) = 1 AND
+        t1.last_name IS NOT NULL AND 
+        adr1.postal_code > ''";
       }
       if ($table == 'civicrm_contact' && $col == 'custom_prefix_initial_last_phone') {
         $data[$key] = "
     SELECT t1.id id1, t2.id id2, $wt weight 
-      FROM civicrm_contact t1
-INNER JOIN civicrm_phone ph1 ON t1.id = ph1.contact_id 
-      JOIN ( SELECT cc.id, cc.prefix_id, cc.first_name, cc.last_name, cc.contact_type, REPLACE(ph2.phone, ' ', '') as rphone 
-               FROM civicrm_contact cc
-         INNER JOIN civicrm_phone ph2 ON cc.id = ph2.contact_id ) t2 ON t1.prefix_id  = t2.prefix_id AND 
-                                                                        t1.first_name = t2.first_name AND
-                                                                        t1.last_name  = t2.last_name AND 
-                                                                        REPLACE(ph1.phone, ' ', '') = t2.rphone
-     WHERE t1.contact_type = 'Individual' AND 
-           t2.contact_type = 'Individual' AND 
-           t1.id < t2.id AND 
-           t1.prefix_id IS NOT NULL AND 
-           CHAR_LENGTH(t1.first_name) = 1 AND
-           t1.last_name  IS NOT NULL AND 
-           ph1.phone IS NOT NULL AND ph1.phone <> ''";
+    FROM
+        civicrm_contact t1
+        INNER JOIN civicrm_phone ph1 ON t1.id = ph1.contact_id 
+        INNER JOIN (SELECT cc.id, cc.prefix_id, cc.first_name, cc.last_name, cc.contact_type, REPLACE(ph2.phone, ' ', '') as rphone 
+                    FROM
+                        civicrm_contact cc
+                        INNER JOIN civicrm_phone ph2 ON cc.id = ph2.contact_id
+                    WHERE
+                        cc.contact_type = 'Individual' AND
+                        cc.last_name IS NOT NULL AND
+                        CHAR_LENGTH(cc.first_name) = 1 AND
+                        cc.prefix_id IS NOT NULL AND
+                        ph2.phone > ''
+                    ) t2 ON t1.prefix_id  = t2.prefix_id AND 
+                            t1.first_name = t2.first_name AND
+                            t1.last_name  = t2.last_name AND 
+                            REPLACE(ph1.phone, ' ', '') = t2.rphone
+    WHERE
+        t1.contact_type = 'Individual' AND 
+        t1.id < t2.id AND 
+        t1.prefix_id IS NOT NULL AND 
+        CHAR_LENGTH(t1.first_name) = 1 AND
+        t1.last_name  IS NOT NULL AND 
+        ph1.phone > ''";
       }
     }
   }
